@@ -1,23 +1,45 @@
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import java.io.FileReader; // Nhập lớp FileReader để đọc các tệp ký tự.
+import java.io.FileWriter; // Nhập lớp FileWriter để ghi các tệp ký tự.
+import java.io.IOException; // Nhập lớp IOException để xử lý các lỗi I/O.
+import java.time.LocalDate; // Nhập lớp LocalDate để đại diện cho một ngày không có thời gian.
+import java.time.LocalDateTime; // Nhập lớp LocalDateTime để đại diện cho ngày và giờ.
+import java.time.format.DateTimeFormatter; // Nhập DateTimeFormatter để định dạng và phân tích ngày/giờ.
+import java.time.format.DateTimeParseException; // Nhập DateTimeParseException để xử lý lỗi trong quá trình phân tích ngày/giờ.
+import org.json.simple.JSONArray; // Nhập JSONArray để làm việc với các mảng JSON.
+import org.json.simple.JSONObject; // Nhập JSONObject để làm việc với các đối tượng JSON.
+import org.json.simple.parser.JSONParser; // Nhập JSONParser để phân tích các chuỗi JSON.
+import org.json.simple.parser.ParseException; // Nhập ParseException để xử lý lỗi trong quá trình phân tích JSON.
+import java.util.UUID; // Nhập UUID để tạo các định danh duy nhất toàn cầu.
 
-public class PersonalTaskManagerViolations {
+public class PersonalTaskManagerRefactored { // Định nghĩa lớp chính cho trình quản lý tác vụ cá nhân.
 
-    private static final String DB_FILE_PATH = "tasks_database.json";
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final String DB_FILE_PATH = "tasks_database.json"; // Định nghĩa hằng số cho đường dẫn tệp cơ sở dữ liệu.
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd"); // Định nghĩa bộ định dạng ngày hằng số.
 
+    // --- Commit 1: refactor: Tách các hàm kiểm tra đầu vào validate input (null, priority, ngày) ---
+
+    // Phương thức kiểm tra xem một chuỗi có rỗng hoặc null không (sau khi loại bỏ khoảng trắng).
+    private boolean isNullOrEmpty(String s) {
+        return s == null || s.trim().isEmpty(); // Trả về true nếu chuỗi là null hoặc rỗng/chỉ chứa khoảng trắng.
+    }
+
+    // Phương thức để xác thực xem chuỗi ưu tiên đã cho có phải là một trong các giá trị được phép không.
+    private boolean isValidPriority(String priority) {
+        String[] validPriorities = {"Thấp", "Trung bình", "Cao"}; // Định nghĩa một mảng các chuỗi ưu tiên hợp lệ.
+        for (String p : validPriorities) { // Lặp qua từng ưu tiên hợp lệ.
+            if (p.equals(priority)) return true; // Nếu ưu tiên đã cho khớp với một trong các ưu tiên hợp lệ, trả về true.
+        }
+        return false; // Nếu không tìm thấy sự trùng khớp, trả về false.
+    }
+
+    // Phương thức để phân tích một chuỗi ngày thành một đối tượng LocalDate.
+    private LocalDate parseDueDate(String dateStr) {
+        try { // Cố gắng phân tích chuỗi ngày.
+            return LocalDate.parse(dateStr, DATE_FORMATTER); // Phân tích chuỗi bằng cách sử dụng bộ định dạng đã định nghĩa.
+        } catch (DateTimeParseException e) { // Bắt một ngoại lệ nếu định dạng chuỗi ngày không hợp lệ.
+            return null; // Trả về null nếu quá trình phân tích thất bại.
+        }
+    }
     // Phương thức trợ giúp để tải dữ liệu (sẽ được gọi lặp lại)
     private static JSONArray loadTasksFromDb() {
         JSONParser parser = new JSONParser();
