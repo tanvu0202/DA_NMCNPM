@@ -40,40 +40,57 @@ public class PersonalTaskManagerRefactored { // Định nghĩa lớp chính cho 
             return null; // Trả về null nếu quá trình phân tích thất bại.
         }
     }
-    // Phương thức trợ giúp để tải dữ liệu (sẽ được gọi lặp lại)
-    private static JSONArray loadTasksFromDb() {
-        JSONParser parser = new JSONParser();
-        try (FileReader reader = new FileReader(DB_FILE_PATH)) {
-            Object obj = parser.parse(reader);
-            if (obj instanceof JSONArray) {
-                return (JSONArray) obj;
+   // --- Commit 2: refactor: Tách hàm kiểm tra nhiệm vụ trùng lặp và tạo task JSON ---
+
+    // Phương thức để tải các tác vụ từ tệp cơ sở dữ liệu JSON.
+    private JSONArray loadTasksFromDb() {
+        JSONParser parser = new JSONParser(); // Tạo một thể hiện trình phân tích JSON mới.
+        try (FileReader reader = new FileReader(DB_FILE_PATH)) { // Cố gắng mở FileReader cho tệp cơ sở dữ liệu.
+            Object obj = parser.parse(reader); // Phân tích nội dung của tệp thành một đối tượng Java.
+            if (obj instanceof JSONArray) { // Kiểm tra xem đối tượng đã phân tích có phải là JSONArray không.
+                return (JSONArray) obj; // Ép kiểu và trả về đối tượng dưới dạng JSONArray.
             }
-        } catch (IOException | ParseException e) {
-            System.err.println("Lỗi khi đọc file database: " + e.getMessage());
+        } catch (IOException | ParseException e) { // Bắt IOException (lỗi I/O tệp) hoặc ParseException (lỗi phân tích JSON).
+            System.err.println("Lỗi khi đọc file database: " + e.getMessage()); // In thông báo lỗi ra console.
         }
-        return new JSONArray();
+        return new JSONArray(); // Trả về một JSONArray rỗng nếu có bất kỳ lỗi nào xảy ra hoặc tệp rỗng/không hợp lệ.
     }
 
-    // Phương thức trợ giúp để lưu dữ liệu
-    private static void saveTasksToDb(JSONArray tasksData) {
-        try (FileWriter file = new FileWriter(DB_FILE_PATH)) {
-            file.write(tasksData.toJSONString());
-            file.flush();
-        } catch (IOException e) {
-            System.err.println("Lỗi khi ghi vào file database: " + e.getMessage());
+    // Phương thức để lưu các tác vụ vào tệp cơ sở dữ liệu JSON.
+    private void saveTasksToDb(JSONArray tasksData) {
+        try (FileWriter file = new FileWriter(DB_FILE_PATH)) { // Cố gắng mở FileWriter cho tệp cơ sở dữ liệu.
+            file.write(tasksData.toJSONString()); // Ghi mảng JSON vào tệp dưới dạng chuỗi.
+            file.flush(); // Xả luồng, đảm bảo tất cả dữ liệu được đệm được ghi vào tệp.
+        } catch (IOException e) { // Bắt IOException nếu lỗi I/O xảy ra trong quá trình ghi.
+            System.err.println("Lỗi khi ghi vào file database: " + e.getMessage()); // In thông báo lỗi ra console.
         }
     }
 
-    /**
-     * Chức năng thêm nhiệm vụ mới
-     *
-     * @param title Tiêu đề nhiệm vụ.
-     * @param description Mô tả nhiệm vụ.
-     * @param dueDateStr Ngày đến hạn (định dạng YYYY-MM-DD).
-     * @param priorityLevel Mức độ ưu tiên ("Thấp", "Trung bình", "Cao").
-     * @param isRecurring Boolean có phải là nhiệm vụ lặp lại không.
-     * @return JSONObject của nhiệm vụ đã thêm, hoặc null nếu có lỗi.
-     */
+    // Phương thức kiểm tra xem một tác vụ có cùng tiêu đề và ngày đến hạn đã tồn tại trong danh sách chưa.
+    private boolean isDuplicateTask(JSONArray tasks, String title, LocalDate dueDate) {
+        for (Object obj : tasks) { // Lặp qua từng đối tượng trong JSONArray.
+            JSONObject task = (JSONObject) obj; // Ép kiểu đối tượng thành JSONObject đại diện cho một tác vụ.
+            // Kiểm tra xem tiêu đề tác vụ có khớp (không phân biệt chữ hoa chữ thường) và ngày đến hạn có khớp không.
+            if (task.get("title").toString().equalsIgnoreCase(title)
+                    && task.get("due_date").toString().equals(dueDate.format(DATE_FORMATTER))) {
+                return true; // Trả về true nếu tìm thấy một bản sao.
+            }
+        }
+        return false; // Trả về false nếu không tìm thấy bản sao nào.
+    }
+    // Phương thức để tạo một tác vụ mới dưới dạng JSONObject.
+    private JSONObject createNewTask(String title, String description, LocalDate dueDate, String priority) {
+        JSONObject task = new JSONObject(); // Tạo một JSONObject trống mới.
+        task.put("id", UUID.randomUUID().toString()); // Gán một ID duy nhất cho tác vụ.
+        task.put("title", title); // Đặt tiêu đề tác vụ.
+        task.put("description", description); // Đặt mô tả tác vụ.
+        task.put("due_date", dueDate.format(DATE_FORMATTER)); // Đặt ngày đến hạn, được định dạng dưới dạng chuỗi.
+        task.put("priority", priority); // Đặt mức độ ưu tiên của tác vụ.
+        task.put("status", "Chưa hoàn thành"); // Đặt trạng thái ban đầu của tác vụ.
+        task.put("created_at", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)); // Ghi lại dấu thời gian tạo.
+        task.put("last_updated_at", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)); // Ghi lại dấu thời gian cập nhật lần cuối.
+        return task; // Trả về JSONObject tác vụ mới được tạo.
+    }
     public JSONObject addNewTaskWithViolations(String title, String description,
                                                 String dueDateStr, String priorityLevel,
                                                 boolean isRecurring) {
